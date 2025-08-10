@@ -1,0 +1,68 @@
+[tool.pytest.ini_options]
+pythonpath = ["src", "tests"]
+norecursedirs = [
+    "tests/testkit"
+]
+
+[tool.ruff]
+line-length = 111
+
+[build-system]
+requires = ["setuptools", "setuptools_scm"]
+build-backend = "setuptools.build_meta"
+
+[tool.coverage.paths]
+source = ["src"]
+
+[project]
+name = "jwbmisc"
+dynamic = ["version"]
+readme = "README.md"
+description = "Misc util functions of jwb"
+requires-python = ">=3.13"
+license = { file = "LICENSE" }
+authors = [{ name = "Joachim Bargsten", email = "jw@bargsten.org" }]
+dependencies = [
+    "pyyaml",
+    "more-itertools",
+    "keyring"
+]
+
+[project.urls]
+homepage = "https://github.com/jwbargsten/jwbmisc"
+repository = "https://github.com/jwbargsten/jwbmisc"
+
+[project.optional-dependencies]
+dev = [
+    "ruff",
+    "pytest>=7",
+    "setuptools_scm",
+    "mypy",
+    "pytest-env",
+    "pytest-mock",
+]
+build = [
+    "build",
+    "twine",
+    "tomli",
+    "setuptools_scm",
+    "check-manifest",
+    "check-wheel-contents",
+    "pyroma"
+]
+docs = [
+    "sphinx",
+    "myst-parser",
+    "sphinx-sitemap",
+    "setuptools_scm",
+    "pydata-sphinx-theme",
+    "sphinx-autodoc-typehints",
+    "myst-nb",
+]
+
+all = [
+    "jwbmisc[dev,build,docs]"
+]
+
+[tool.setuptools_scm]
+write_to = "src/jwbmisc/_version.py"
