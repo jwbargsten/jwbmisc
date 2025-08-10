@@ -1,0 +1,5 @@
+exclude .*
+prune .github
+include Makefile
+recursive-include tests *.py
+recursive-include src *.py

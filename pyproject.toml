@@ -19,7 +19,7 @@ name = "jwbmisc"
 dynamic = ["version"]
 readme = "README.md"
 description = "Misc util functions of jwb"
-requires-python = ">=3.13"
+requires-python = ">=3.11"
 license = { file = "LICENSE" }
 authors = [{ name = "Joachim Bargsten", email = "jw@bargsten.org" }]
 dependencies = [
