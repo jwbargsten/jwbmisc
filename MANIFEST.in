@@ -1,5 +1,6 @@
 exclude .*
 prune .github
 include Makefile
+include *.sh
 recursive-include tests *.py
 recursive-include src *.py
