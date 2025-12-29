@@ -4,7 +4,7 @@ import random
 import string
 import re
 from collections.abc import Iterable
-from typing import Any
+from typing import Any, Optional
 import os
 import json
 from pathlib import Path
@@ -146,6 +146,15 @@ def get_pass(*pass_keys: str):
                 raise KeyError(f"could not find a password for {pass_key}")
             return pw
 
+        if pass_key.startswith("keeper://"):
+            # Parse keeper://RECORD_UID/field/fieldname
+            path = pass_key.removeprefix("keeper://")
+            if "/" not in path:
+                raise KeyError(f"Invalid keeper:// format. Expected: keeper://RECORD_UID/field/fieldname")
+
+            record_uid, field_path = path.split("/", 1)
+            return _get_keeper_password(record_uid, field_path)
+
     raise KeyError(f"Could not acquire password from one of {pass_keys}")
 
 
@@ -165,6 +174,200 @@ def _call_unix_pass(key, lnum=1):
         raise KeyError(f"could not not retrieve lines {lnum} for {key}")
 
     return pw
+
+
+class _MinimalKeeperUI:
+    """Minimal UI for SSO + TOTP using questionary."""
+
+    def on_sso_redirect(self, step):
+        import webbrowser
+        import questionary
+
+        print(f"\nOpening SSO login URL in browser...")
+        webbrowser.open_new_tab(step.sso_login_url)
+
+        token = questionary.text(
+            "Paste the SSO token from your browser:",
+            instruction="(Token appears in URL or on page after login)"
+        ).ask()
+
+        if not token:
+            raise KeyError("No SSO token provided")
+        step.set_sso_token(token.strip())
+
+    def on_two_factor(self, step):
+        import questionary
+        from keepercommander.auth import login_steps
+
+        channels = step.get_channels()
+        totp_channel = next(
+            (c for c in channels if c.channel_type == login_steps.TwoFactorChannel.Authenticator),
+            None
+        )
+
+        if not totp_channel:
+            raise KeyError("TOTP authenticator not available")
+
+        totp_code = questionary.text(
+            "Enter 2FA code from your authenticator app:",
+            validate=lambda text: len(text) == 6 and text.isdigit()
+        ).ask()
+
+        if not totp_code:
+            raise KeyError("No TOTP code provided")
+
+        step.duration = login_steps.TwoFactorDuration.Every12Hours
+        step.send_code(totp_channel.channel_uid, totp_code.strip())
+
+    def on_password(self, step):
+        raise KeyError("Password login not supported. Use SSO.")
+
+    def on_device_approval(self, step):
+        print("⏳ Waiting for device approval...")
+
+    def on_sso_data_key(self, step):
+        from keepercommander.auth import login_steps
+        step.request_data_key(login_steps.DataKeyShareChannel.KeeperPush)
+
+
+def _extract_keeper_field(record, field_path: str) -> Optional[str]:
+    """Extract field value from Keeper record."""
+    from keepercommander import vault as keeper_vault
+
+    # Parse field path: "field/password" or "custom_field/api_key"
+    parts = field_path.split("/", 1)
+    if len(parts) != 2:
+        return None
+
+    field_type, field_name = parts
+
+    # Handle V2 PasswordRecord
+    if isinstance(record, keeper_vault.PasswordRecord):
+        if field_type == "field":
+            if field_name == "password":
+                return record.password
+            elif field_name == "login":
+                return record.login
+            elif field_name == "notes":
+                return record.notes
+
+    # Handle V3 TypedRecord
+    elif isinstance(record, keeper_vault.TypedRecord):
+        if field_type == "field":
+            field = record.get_typed_field(field_name)
+        elif field_type == "custom_field":
+            field = next((f for f in record.custom if f.label == field_name), None)
+        else:
+            return None
+
+        if field and field.value:
+            # Return first value if list
+            return field.value[0] if isinstance(field.value, list) else str(field.value)
+
+    return None
+
+
+def _perform_keeper_login(params):
+    """Perform interactive Keeper SSO login with TOTP support."""
+    from keepercommander import api
+    from keepercommander.config_storage import loader
+    import questionary
+
+    # Get username if not set
+    if not params.user:
+        print("\n" + "="*70)
+        print("KEEPER COMMANDER - SSO LOGIN")
+        print("="*70)
+
+        params.user = questionary.text(
+            "Enter your Keeper username (email):",
+            validate=lambda text: "@" in text
+        ).ask()
+
+        if not params.user:
+            raise KeyError("No username provided")
+
+    # Set hostname
+    params.server = os.environ.get("KEEPER_HOSTNAME", "keepersecurity.com")
+
+    # Custom UI for SSO + TOTP
+    ui = _MinimalKeeperUI()
+
+    # Perform login
+    try:
+        api.login(params, login_ui=ui)
+        loader.store_config_properties(params)
+        print("✓ Keeper login successful!")
+    except KeyboardInterrupt:
+        raise KeyError("\nKeeper login cancelled by user.") from None
+    except Exception as e:
+        raise KeyError(f"Keeper login failed: {e}") from e
+
+
+def _get_keeper_password(record_uid: str, field_path: str) -> str:
+    """
+    Retrieve password from Keeper vault using Commander.
+
+    Args:
+        record_uid: Keeper record UID
+        field_path: Field path like 'field/password' or 'custom_field/api_key'
+
+    Returns:
+        The password/secret value
+
+    Raises:
+        KeyError: If authentication fails or record/field not found
+    """
+    # Lazy import Commander
+    try:
+        from keepercommander.params import KeeperParams
+        from keepercommander import api
+        from keepercommander.config_storage import loader
+        from keepercommander import vault as keeper_vault
+    except ImportError as e:
+        raise KeyError(
+            "Keeper Commander not installed. Install with: pip install keepercommander"
+        ) from e
+
+    # Setup config path
+    config_file = Path.home() / ".keeper" / "config.json"
+    config_file.parent.mkdir(parents=True, exist_ok=True)
+
+    # Initialize params
+    params = KeeperParams(config_filename=str(config_file))
+    params.user = os.environ.get("KEEPER_USERNAME", "")
+
+    # Load existing session or login
+    if config_file.exists():
+        try:
+            loader.load_config_properties(params)
+            if not params.session_token:
+                raise ValueError("No session token")
+        except Exception:
+            # Session invalid, re-login
+            _perform_keeper_login(params)
+    else:
+        # First time login
+        _perform_keeper_login(params)
+
+    # Sync vault
+    try:
+        api.sync_down(params)
+    except Exception as e:
+        raise KeyError(f"Failed to sync Keeper vault: {e}") from e
+
+    # Get record
+    try:
+        record = keeper_vault.KeeperRecord.load(params, record_uid)
+    except Exception as e:
+        raise KeyError(f"Record {record_uid} not found: {e}") from e
+
+    # Extract field value
+    value = _extract_keeper_field(record, field_path)
+    if value is None:
+        raise KeyError(f"Field '{field_path}' not found in record {record_uid}")
+
+    return value
 
 
 def jinja_replace(s, config, relaxed=False, delim=("{{", "}}")):
