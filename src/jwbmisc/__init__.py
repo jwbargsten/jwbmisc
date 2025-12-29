@@ -213,16 +213,19 @@ def find_root(start, req):
         p = p.parent
     return None
 
+
 def jsonc_loads(data: str):
     data = re.sub(r"//.*$", "", data, flags=re.MULTILINE)
     data = re.sub(r"/\*.*?\*/", "", data, flags=re.DOTALL)
     return json.loads(data)
+
 
 def jsonc_read(f: str | Path):
     f = Path(f)
     open_fn = gzip.open if f.suffix.lower() == ".gz" else open
     with open_fn(f, "rt", encoding="utf-8") as fd:
         return jsonc_loads(fd.read())
+
 
 def ndjson_read(f: str | Path):
     f = Path(f)
@@ -241,3 +244,7 @@ def ndjson_write(data: list[Any], f: str | Path):
         for record in data:
             blob = (json.dumps(record) + "\n").encode("utf-8")
             fd.write(blob)
+
+
+def qw(s: str) -> list[str]:
+    return s.split()
