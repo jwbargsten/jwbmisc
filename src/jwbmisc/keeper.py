@@ -72,7 +72,7 @@ def _extract_keeper_field(record, field: str) -> str | None:
             value = next((f for f in record.custom if f.label == field), None)
 
         if value and value.value:
-            return value.value[0] if isinstance(value.value, list) else str(field.value)
+            return value.value[0] if isinstance(value.value, list) else str(value.value)
 
     return None
 

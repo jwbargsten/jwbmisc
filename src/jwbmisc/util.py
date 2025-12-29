@@ -7,7 +7,7 @@ def ask(question, default=None):
     if default is not None:
         question += f" [{default}]"
     answer = input(question.strip() + " ").strip()
-    return answer
+    return answer if answer else default
 
 
 def confirm(question, default="n"):
@@ -15,6 +15,8 @@ def confirm(question, default="n"):
     if default is not None:
         prompt += f" [{default}]"
     answer = input(prompt).strip().lower()
+    if not answer:
+        answer = default.lower() if default else "n"
     return answer.startswith("y")
 
 
@@ -49,7 +51,7 @@ def goo(
     for p in parts:
         if res is None:
             if raise_on_default:
-                raise ValueError("'{path}' does not exist")
+                raise ValueError(f"'{path}' does not exist")
             return default
         if isinstance(res, (list, set, tuple)):
             res = res[int(p)]
@@ -57,6 +59,6 @@ def goo(
             res = res.get(p)
     if res is None:
         if raise_on_default:
-            raise ValueError("'{path}' does not exist")
+            raise ValueError(f"'{path}' does not exist")
         return default
     return res

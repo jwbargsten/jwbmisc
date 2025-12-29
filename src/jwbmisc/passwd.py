@@ -28,10 +28,8 @@ def get_pass(*pass_keys: str):
             return f.read_text().strip()
 
         if pass_key.startswith("keyring://"):
-            try:
-                import keyring
-            except ImportError as e:
-                raise e
+            import keyring
+
             args = pass_key.removeprefix("keyring://").split("/")
             pw = keyring.get_password(*args)
             if pw is None:
@@ -50,8 +48,11 @@ def get_pass(*pass_keys: str):
 
 
 def _call_unix_pass(key, lnum=1):
-    proc = sp.Popen(["pass", "show", key], stdout=sp.PIPE, encoding="utf-8")
-    value, _ = proc.communicate()
+    proc = sp.Popen(["pass", "show", key], stdout=sp.PIPE, stderr=sp.PIPE, encoding="utf-8")
+    value, stderr = proc.communicate()
+
+    if proc.returncode != 0:
+        raise KeyError(f"pass failed for '{key}': {stderr.strip()}")
 
     if lnum is None or lnum == 0:
         return value.strip()
@@ -60,17 +61,15 @@ def _call_unix_pass(key, lnum=1):
     try:
         if isinstance(lnum, list):
             pw = [lines[ln - 1].strip() for ln in lnum]
-        else: 
+        else:
             pw = lines[lnum - 1].strip()
     except IndexError:
-        raise KeyError(f"could not not retrieve lines {lnum} for {key}")
+        raise KeyError(f"could not retrieve lines {lnum} for {key}")
 
     return pw
 
 
 def _keeper_password(record_uid: str, field_path: str) -> str:
-    try:
-        from .keeper import get_keeper_password
-    except ImportError as e:
-        raise e
+    from .keeper import get_keeper_password
+
     return get_keeper_password(record_uid, field_path)
