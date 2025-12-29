@@ -1,4 +1,3 @@
-from typing import Optional
 import json
 from keepercommander import vault as keeper_vault
 from keepercommander import api
@@ -10,6 +9,9 @@ from .util import ask
 from pathlib import Path
 import webbrowser
 from keepercommander.auth import login_steps
+from logging import getLogger
+
+logger = getLogger(__name__)
 
 
 class _MinimalKeeperUI:
@@ -43,33 +45,29 @@ class _MinimalKeeperUI:
         step.duration = login_steps.TwoFactorDuration.Every12Hours
         try:
             step.send_code(totp_channel.channel_uid, totp_code.strip())
-            print("keeper 2fa su7ccess")
+            logger.info("keeper 2fa success")
         except api.KeeperApiError:
-            print("keeper api error")
-
-
+            logger.info("keeper api error")
 
     def on_password(self, _step):
         raise KeyError("Password login not supported. Use SSO.")
 
     def on_device_approval(self, _step):
-        print("Waiting for device approval...")
+        logger.info("Waiting for device approval...")
 
     def on_sso_data_key(self, step):
-        print("dqata key")
         if not self.waiting_for_sso_data_key:
-            print("push")
+            logger.info("sent push")
             step.request_data_key(login_steps.DataKeyShareChannel.KeeperPush)
             self.waiting_for_sso_data_key = True
+        logger.info("waiting for push")
         sleep(1)
         step.resume()
 
 
 def _extract_keeper_field(record, field: str) -> str | None:
     if isinstance(record, keeper_vault.TypedRecord):
-        print("typed")
         value = record.get_typed_field(field)
-        print(value)
         if value is None:
             value = next((f for f in record.custom if f.label == field), None)
 
@@ -80,7 +78,6 @@ def _extract_keeper_field(record, field: str) -> str | None:
 
 
 def _perform_keeper_login(params):
-    print(vars(params))
     if not params.user:
         user = os.environ.get("KEEPER_USERNAME", None)
         if user is None:
@@ -93,16 +90,13 @@ def _perform_keeper_login(params):
         server = os.environ.get("KEEPER_SERVER", None)
         if server is None:
             server = ask("Server:")
-    
+
         if not server:
             raise ValueError("No server provided")
         params.server = server
 
     try:
-        print(params)
         api.login(params, login_ui=_MinimalKeeperUI())
-        print("login ok")
-        # loader.store_config_properties(params)
     except KeyboardInterrupt:
         raise KeyError("\nKeeper login cancelled by user.") from None
     except Exception as e:
@@ -121,21 +115,16 @@ def get_keeper_password(record_uid: str, field_path: str) -> str:
             loader.load_config_properties(params)
             if not params.session_token:
                 raise ValueError("No session token")
-        except Exception as ex:
-            print(ex)
+        except Exception:
             _perform_keeper_login(params)
     else:
         _perform_keeper_login(params)
 
-    print("sync")
     try:
         api.sync_down(params)
     except Exception as e:
         raise KeyError(f"Failed to sync Keeper vault: {e}") from e
 
-    print("record")
-    print(params)
-    print(record_uid)
     try:
         record = keeper_vault.KeeperRecord.load(params, record_uid)
     except Exception as e:
