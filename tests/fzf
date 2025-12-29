@@ -1,0 +1,4 @@
+#!/bin/bash
+# Fake fzf script - returns first line of stdin
+read -r line
+echo "$line"
