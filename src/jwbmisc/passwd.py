@@ -60,7 +60,8 @@ def _call_unix_pass(key, lnum=1):
     try:
         if isinstance(lnum, list):
             pw = [lines[ln - 1].strip() for ln in lnum]
-        pw = lines[lnum - 1].strip()
+        else: 
+            pw = lines[lnum - 1].strip()
     except IndexError:
         raise KeyError(f"could not not retrieve lines {lnum} for {key}")
 

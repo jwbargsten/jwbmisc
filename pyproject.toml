@@ -25,7 +25,6 @@ authors = [{ name = "Joachim Bargsten", email = "jw@bargsten.org" }]
 dependencies = [
     "pyyaml",
     "more-itertools",
-    "keyring"
 ]
 
 [project.urls]
@@ -40,6 +39,8 @@ dev = [
     "mypy",
     "pytest-env",
     "pytest-mock",
+    "keepercommander",
+    "keyring"
 ]
 build = [
     "build",
