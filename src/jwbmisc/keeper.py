@@ -13,6 +13,8 @@ from logging import getLogger
 
 logger = getLogger(__name__)
 
+CONFIG_FILE = Path.home() / ".config" / "jwbmisc" / "keeper.json"
+
 
 class MinimalKeeperUI:
     def __init__(self):
@@ -104,14 +106,13 @@ def perform_login(params):
 
 
 def get_password(record_uid: str, field_path: str) -> str:
-    config_file = Path.home() / ".config" / "keeper" / "config.json"
-    config_file.parent.mkdir(parents=True, exist_ok=True)
+    CONFIG_FILE.parent.mkdir(parents=True, exist_ok=True)
 
-    params = KeeperParams(config_filename=str(config_file))
+    params = KeeperParams(config_filename=str(CONFIG_FILE))
 
-    if config_file.exists():
+    if CONFIG_FILE.exists():
         try:
-            params.config = json.loads(config_file.read_text())
+            params.config = json.loads(CONFIG_FILE.read_text())
             loader.load_config_properties(params)
             if not params.session_token:
                 raise ValueError("No session token")
