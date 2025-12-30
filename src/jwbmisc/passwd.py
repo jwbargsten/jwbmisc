@@ -40,11 +40,9 @@ def get_pass(*pass_keys: str):
 
         if pass_key.startswith("keeper://"):
             path = pass_key.removeprefix("keeper://")
-            if "/" not in path:
-                raise KeyError("Invalid keeper:// format. Expected: keeper://RECORD_UID/field/fieldname")
 
-            record_uid, field_path = path.split("/", 1)
-            return _keeper_password(record_uid, field_path)
+            parts = path.split("/")
+            return _keeper_password(*parts)
 
     raise KeyError(f"Could not acquire password from one of {pass_keys}")
 
@@ -71,7 +69,7 @@ def _call_unix_pass(key, lnum=1):
     return pw
 
 
-def _keeper_password(record_uid: str, field_path: str) -> str:
+def _keeper_password(record_uid: str, field_path: str | None = None) -> str:
     from .keeper import get_password as keeper_get_password
 
     return keeper_get_password(record_uid, field_path)

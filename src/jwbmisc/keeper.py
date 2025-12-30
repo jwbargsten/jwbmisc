@@ -1,4 +1,5 @@
 import json
+from typing import Any
 from keepercommander import vault
 from keepercommander import api
 from time import sleep
@@ -67,15 +68,41 @@ class MinimalKeeperUI:
         step.resume()
 
 
-def extract_record_field(record, field: str) -> str | None:
-    if not isinstance(record, vault.TypedRecord):
-        raise TypeError("only TypedRecord is supported")
+def as_strings(vs: list[Any] | Any) -> list[str]:
+    if not isinstance(vs, list):
+        vs = [vs]
+    return [str(v) for v in vs]
 
-    value = record.get_typed_field(field) or record.get_typed_field(None, field)
 
-    if value and value.value:
-        return value.value[0] if isinstance(value.value, list) else str(value.value)
+def extract_record_field(record, field: str | None) -> str | None | list[dict[str, str | list[str]]]:
+    if isinstance(record, vault.PasswordRecord):
+        values = [
+            {"type": "password", "label": "login", "value": as_strings(record.login)},
+            {"type": "password", "label": "password", "value": as_strings(record.password)},
+            {"type": "password", "label": "link", "value": as_strings(record.link)},
+        ] + [{"type": f.type, "label": f.name, "value": as_strings(f.value)} for f in record.custom]
 
+    elif isinstance(record, vault.TypedRecord):
+        fields = record.fields + record.custom
+        values = [{"type": f.type, "label": f.label, "value": as_strings(f.value)} for f in fields]
+    else:
+        raise TypeError("only TypedRecord & PasswordRecord are supported")
+
+    if not field:
+        return values
+
+    value = next(
+        (
+            v
+            for v in values
+            if (v["type"] and v["type"].lower() == field.lower())
+            or (v["label"] and v["label"].lower() == field.lower())
+        ),
+        None,
+    )
+
+    if value and value["value"]:
+        return value["value"][0]
     return None
 
 
@@ -105,7 +132,7 @@ def perform_login(params):
         raise KeyError(f"Keeper login failed: {e}") from e
 
 
-def get_password(record_uid: str, field_path: str) -> str:
+def get_password(record_uid: str, field_path: str | None) -> str:
     CONFIG_FILE.parent.mkdir(parents=True, exist_ok=True)
 
     params = KeeperParams(config_filename=str(CONFIG_FILE))
