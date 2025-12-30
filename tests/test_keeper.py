@@ -1,69 +1,61 @@
+# pyright: basic
 import pytest
 
+from keepercommander import vault, utils
 from jwbmisc.keeper import (
-    _MinimalKeeperUI,
-    _extract_keeper_field,
-    _perform_keeper_login,
-    get_keeper_password,
+    MinimalKeeperUI,
+    extract_record_field,
+    perform_login,
+    get_password,
 )
 
 
-class MockTypedField:
-    def __init__(self, value):
-        self.value = value
-        self.label = None
-
-
-class MockTypedRecord:
-    def __init__(self, fields=None, custom=None):
-        self._fields = fields or {}
-        self.custom = custom or []
-
-    def get_typed_field(self, name):
-        return self._fields.get(name)
+def gen_record(type_name="login"):
+    record = vault.TypedRecord()
+    record.type_name = type_name
+    record.record_uid = utils.generate_uid()
+    record.record_key = utils.generate_aes_key()
+    record.fields.append(
+        vault.TypedField.new_field(
+            field_type="password", field_label="AWS Secret Sauce", field_value=["password123"]
+        )
+    )
+    return record
 
 
 class TestExtractKeeperField:
-    def test_typed_record_with_list_value(self, mocker):
-        mocker.patch("jwbmisc.keeper.keeper_vault.TypedRecord", MockTypedRecord)
-        field = MockTypedField(["password123"])
-        record = MockTypedRecord(fields={"password": field})
+    def test_typed_record_with_list_value(self):
+        record = gen_record()
 
-        result = _extract_keeper_field(record, "password")
+        result = extract_record_field(record, "password")
         assert result == "password123"
 
-    def test_typed_record_with_string_value(self, mocker):
-        mocker.patch("jwbmisc.keeper.keeper_vault.TypedRecord", MockTypedRecord)
-        field = MockTypedField("single_value")
-        record = MockTypedRecord(fields={"password": field})
-
-        result = _extract_keeper_field(record, "password")
-        assert result == "single_value"
-
-    def test_typed_record_field_not_found(self, mocker):
-        mocker.patch("jwbmisc.keeper.keeper_vault.TypedRecord", MockTypedRecord)
-        record = MockTypedRecord(fields={})
-
-        result = _extract_keeper_field(record, "missing")
+    def test_typed_record_field_not_found(self):
+        record = gen_record()
+        record.fields = []
+        result = extract_record_field(record, "missing")
         assert result is None
 
-    def test_typed_record_custom_field(self, mocker):
-        mocker.patch("jwbmisc.keeper.keeper_vault.TypedRecord", MockTypedRecord)
-        custom_field = MockTypedField(["custom_value"])
-        custom_field.label = "custom_field"
-        record = MockTypedRecord(fields={}, custom=[custom_field])
-
-        result = _extract_keeper_field(record, "custom_field")
-        assert result == "custom_value"
+    def test_typed_record_custom_field(self):
+        record = gen_record()
+        record.custom.append(
+            vault.TypedField.new_field(
+                field_type="passwordcustom", field_label="AWS Custom Secret Sauce", field_value=["password3"]
+            )
+        )
+        result = extract_record_field(record, "passwordcustom")
+        assert result == "password3"
+        result = extract_record_field(record, "AWS Custom Secret Sauce")
+        assert result == "password3"
 
     def test_non_typed_record_returns_none(self):
-        result = _extract_keeper_field(object(), "any_field")
-        assert result is None
+        with pytest.raises(TypeError):
+            extract_record_field(object(), "any_field")
 
 
 class TestMinimalKeeperUI:
     def test_on_password_raises(self):
-        ui = _MinimalKeeperUI()
+        ui = MinimalKeeperUI()
         with pytest.raises(KeyError, match="Password login not supported"):
             ui.on_password(None)
 
@@ -74,7 +66,7 @@ class TestMinimalKeeperUI:
         step = mocker.MagicMock()
         step.sso_login_url = "https://sso.example.com"
 
-        ui = _MinimalKeeperUI()
+        ui = MinimalKeeperUI()
         ui.on_sso_redirect(step)
 
         mock_webbrowser.open_new_tab.assert_called_once_with("https://sso.example.com")
@@ -87,7 +79,7 @@ class TestMinimalKeeperUI:
         step = mocker.MagicMock()
         step.sso_login_url = "https://sso.example.com"
 
-        ui = _MinimalKeeperUI()
+        ui = MinimalKeeperUI()
         with pytest.raises(ValueError, match="No SSO token"):
             ui.on_sso_redirect(step)
 
@@ -100,7 +92,7 @@ class TestMinimalKeeperUI:
         step = mocker.MagicMock()
         step.get_channels.return_value = [mock_channel]
 
-        ui = _MinimalKeeperUI()
+        ui = MinimalKeeperUI()
         ui.on_two_factor(step)
 
         step.send_code.assert_called_once_with("channel_123", "123456")
@@ -113,12 +105,12 @@ class TestMinimalKeeperUI:
         step = mocker.MagicMock()
         step.get_channels.return_value = [mock_channel]
 
-        ui = _MinimalKeeperUI()
+        ui = MinimalKeeperUI()
         with pytest.raises(ValueError, match="TOTP authenticator not available"):
             ui.on_two_factor(step)
 
     def test_on_device_approval_does_not_raise(self, mocker):
-        ui = _MinimalKeeperUI()
+        ui = MinimalKeeperUI()
         ui.on_device_approval(None)  # Should not raise
 
     def test_on_sso_data_key_first_call(self, mocker):
@@ -127,7 +119,7 @@ class TestMinimalKeeperUI:
 
         step = mocker.MagicMock()
 
-        ui = _MinimalKeeperUI()
+        ui = MinimalKeeperUI()
         assert ui.waiting_for_sso_data_key is False
 
         ui.on_sso_data_key(step)
@@ -141,7 +133,7 @@ class TestMinimalKeeperUI:
         mock_sleep = mocker.patch("jwbmisc.keeper.sleep")
         step = mocker.MagicMock()
 
-        ui = _MinimalKeeperUI()
+        ui = MinimalKeeperUI()
         ui.waiting_for_sso_data_key = True
 
         ui.on_sso_data_key(step)
@@ -159,7 +151,7 @@ class TestPerformKeeperLogin:
         params = mocker.MagicMock()
         params.user = None
 
-        _perform_keeper_login(params)
+        perform_login(params)
 
         assert params.user == "user@example.com"
         assert params.server == "keepersecurity.com"
@@ -173,7 +165,7 @@ class TestPerformKeeperLogin:
         params = mocker.MagicMock()
         params.user = None
 
-        _perform_keeper_login(params)
+        perform_login(params)
 
         assert params.user == "user@example.com"
         assert params.server == "keepersecurity.com"
@@ -188,7 +180,7 @@ class TestPerformKeeperLogin:
         params.user = None
 
         with pytest.raises(KeyError, match="cancelled by user"):
-            _perform_keeper_login(params)
+            perform_login(params)
 
 
 class TestGetKeeperPassword:
@@ -200,15 +192,15 @@ class TestGetKeeperPassword:
         mocker.patch("jwbmisc.keeper.KeeperParams", return_value=mock_params)
 
         mock_api = mocker.patch("jwbmisc.keeper.api")
-        mock_vault = mocker.patch("jwbmisc.keeper.keeper_vault")
+        mock_vault = mocker.patch("jwbmisc.keeper.vault")
 
         mock_record = mocker.MagicMock()
         mock_vault.KeeperRecord.load.return_value = mock_record
 
-        mocker.patch("jwbmisc.keeper._extract_keeper_field", return_value="the_password")
-        mocker.patch("jwbmisc.keeper._perform_keeper_login")
+        mocker.patch("jwbmisc.keeper.extract_record_field", return_value="the_password")
+        mocker.patch("jwbmisc.keeper.perform_login")
 
-        result = get_keeper_password("RECORD123", "password")
+        result = get_password("RECORD123", "password")
 
         assert result == "the_password"
         mock_api.sync_down.assert_called_once()
@@ -221,14 +213,14 @@ class TestGetKeeperPassword:
         mocker.patch("jwbmisc.keeper.KeeperParams", return_value=mock_params)
 
         mocker.patch("jwbmisc.keeper.api")
-        mock_vault = mocker.patch("jwbmisc.keeper.keeper_vault")
+        mock_vault = mocker.patch("jwbmisc.keeper.vault")
         mock_vault.KeeperRecord.load.return_value = mocker.MagicMock()
 
-        mocker.patch("jwbmisc.keeper._extract_keeper_field", return_value=None)
-        mocker.patch("jwbmisc.keeper._perform_keeper_login")
+        mocker.patch("jwbmisc.keeper.extract_record_field", return_value=None)
+        mocker.patch("jwbmisc.keeper.perform_login")
 
         with pytest.raises(KeyError, match="Field.*not found"):
-            get_keeper_password("RECORD123", "missing_field")
+            get_password("RECORD123", "missing_field")
 
     def test_sync_failure_raises(self, mocker, tmp_path):
         mocker.patch("jwbmisc.keeper.Path.home", return_value=tmp_path)
@@ -240,10 +232,10 @@ class TestGetKeeperPassword:
         mock_api = mocker.patch("jwbmisc.keeper.api")
         mock_api.sync_down.side_effect = Exception("Sync failed")
 
-        mocker.patch("jwbmisc.keeper._perform_keeper_login")
+        mocker.patch("jwbmisc.keeper.perform_login")
 
         with pytest.raises(KeyError, match="Failed to sync"):
-            get_keeper_password("RECORD123", "password")
+            get_password("RECORD123", "password")
 
     # def test_keeper_url(self, mocker):
     #     mock_keeper = mocker.patch("jwbmisc.passwd._keeper_password")
@@ -259,8 +251,8 @@ class TestGetKeeperPassword:
 
 
 # class TestKeeperPassword:
-#     def test_delegates_to_get_keeper_password(self, mocker):
-#         mock_get = mocker.patch("jwbmisc.keeper.get_keeper_password")
+#     def test_delegates_to_get_password(self, mocker):
+#         mock_get = mocker.patch("jwbmisc.keeper.get_password")
 #         mock_get.return_value = "keeper_secret"
 
 #         result = _keeper_password("RECORD_UID", "field/path")

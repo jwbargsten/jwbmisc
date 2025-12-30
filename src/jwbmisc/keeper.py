@@ -1,5 +1,5 @@
 import json
-from keepercommander import vault as keeper_vault
+from keepercommander import vault
 from keepercommander import api
 from time import sleep
 from keepercommander.params import KeeperParams
@@ -14,7 +14,7 @@ from logging import getLogger
 logger = getLogger(__name__)
 
 
-class _MinimalKeeperUI:
+class MinimalKeeperUI:
     def __init__(self):
         self.waiting_for_sso_data_key = False
 
@@ -65,19 +65,19 @@ class _MinimalKeeperUI:
         step.resume()
 
 
-def _extract_keeper_field(record, field: str) -> str | None:
-    if isinstance(record, keeper_vault.TypedRecord):
-        value = record.get_typed_field(field)
-        if value is None:
-            value = next((f for f in record.custom if f.label == field), None)
+def extract_record_field(record, field: str) -> str | None:
+    if not isinstance(record, vault.TypedRecord):
+        raise TypeError("only TypedRecord is supported")
 
-        if value and value.value:
-            return value.value[0] if isinstance(value.value, list) else str(value.value)
+    value = record.get_typed_field(field) or record.get_typed_field(None, field)
+
+    if value and value.value:
+        return value.value[0] if isinstance(value.value, list) else str(value.value)
 
     return None
 
 
-def _perform_keeper_login(params):
+def perform_login(params):
     if not params.user:
         user = os.environ.get("KEEPER_USERNAME", None)
         if user is None:
@@ -96,14 +96,14 @@ def _perform_keeper_login(params):
         params.server = server
 
     try:
-        api.login(params, login_ui=_MinimalKeeperUI())
+        api.login(params, login_ui=MinimalKeeperUI())
     except KeyboardInterrupt:
         raise KeyError("\nKeeper login cancelled by user.") from None
     except Exception as e:
         raise KeyError(f"Keeper login failed: {e}") from e
 
 
-def get_keeper_password(record_uid: str, field_path: str) -> str:
+def get_password(record_uid: str, field_path: str) -> str:
     config_file = Path.home() / ".config" / "keeper" / "config.json"
     config_file.parent.mkdir(parents=True, exist_ok=True)
 
@@ -116,9 +116,9 @@ def get_keeper_password(record_uid: str, field_path: str) -> str:
             if not params.session_token:
                 raise ValueError("No session token")
         except Exception:
-            _perform_keeper_login(params)
+            perform_login(params)
     else:
-        _perform_keeper_login(params)
+        perform_login(params)
 
     try:
         api.sync_down(params)
@@ -126,11 +126,11 @@ def get_keeper_password(record_uid: str, field_path: str) -> str:
         raise KeyError(f"Failed to sync Keeper vault: {e}") from e
 
     try:
-        record = keeper_vault.KeeperRecord.load(params, record_uid)
+        record = vault.KeeperRecord.load(params, record_uid)
     except Exception as e:
         raise KeyError(f"Record {record_uid} not found: {e}") from e
 
-    value = _extract_keeper_field(record, field_path)
+    value = extract_record_field(record, field_path)
     if value is None:
         raise KeyError(f"Field '{field_path}' not found in record {record_uid}")
 

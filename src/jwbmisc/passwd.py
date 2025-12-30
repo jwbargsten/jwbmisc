@@ -72,6 +72,6 @@ def _call_unix_pass(key, lnum=1):
 
 
 def _keeper_password(record_uid: str, field_path: str) -> str:
-    from .keeper import get_keeper_password
+    from .keeper import get_password as keeper_get_password
 
-    return get_keeper_password(record_uid, field_path)
+    return keeper_get_password(record_uid, field_path)
