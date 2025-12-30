@@ -1,27 +1,31 @@
+# pyright: basic
 import subprocess
 
 import pytest
+from pathlib import Path
 
 from jwbmisc.exec import run_cmd
 
+PASS_BIN = str((Path(__file__).parent / "pass").absolute())
+
 
 class TestRunCmd:
-    def test_capture_stdout(self, fake_pass):
-        stdout, stderr = run_cmd(["pass", "show", "test/secret"], capture=True)
+    def test_capture_stdout(self):
+        stdout, stderr = run_cmd([PASS_BIN, "show", "test/secret"], capture=True)
         assert stdout.strip() == "password123"
         assert stderr == ""
 
-    def test_capture_disabled_returns_none(self, fake_pass):
-        result = run_cmd(["pass", "show", "test/secret"], capture=False)
+    def test_capture_disabled_returns_none(self):
+        result = run_cmd([PASS_BIN, "show", "test/secret"], capture=False)
         assert result is None
 
-    def test_decode_true_returns_strings(self, fake_pass):
-        stdout, stderr = run_cmd(["pass", "show", "test/secret"], capture=True, decode=True)
+    def test_decode_true_returns_strings(self):
+        stdout, stderr = run_cmd([PASS_BIN, "show", "test/secret"], capture=True, decode=True)
         assert isinstance(stdout, str)
         assert isinstance(stderr, str)
 
-    def test_decode_false_returns_bytes(self, fake_pass):
-        stdout, stderr = run_cmd(["pass", "show", "test/secret"], capture=True, decode=False)
+    def test_decode_false_returns_bytes(self):
+        stdout, stderr = run_cmd([PASS_BIN, "show", "test/secret"], capture=True, decode=False)
         assert isinstance(stdout, bytes)
         assert isinstance(stderr, bytes)
 
@@ -61,14 +65,14 @@ class TestRunCmd:
         result = run_cmd(["echo", "test"], dry_run=True, capture=True)
         assert result == ("", "")
 
-    def test_called_process_error(self, fake_pass):
+    def test_called_process_error(self):
         with pytest.raises(subprocess.CalledProcessError) as exc_info:
-            run_cmd(["pass", "show", "test/missing"], capture=True)
+            run_cmd([PASS_BIN, "show", "test/missing"], capture=True)
         assert exc_info.value.returncode == 1
 
-    def test_sensitive_data_redacted(self, fake_pass):
+    def test_sensitive_data_redacted(self):
         with pytest.raises(subprocess.CalledProcessError) as exc_info:
-            run_cmd(["pass", "show", "test/missing"], capture=True, contains_sensitive_data=True)
+            run_cmd([PASS_BIN, "show", "test/missing"], capture=True, contains_sensitive_data=True)
         assert exc_info.value.stdout == b"<redacted>"
         assert exc_info.value.stderr == b"<redacted>"
 

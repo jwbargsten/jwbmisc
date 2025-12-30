@@ -1,4 +1,6 @@
 import re
+import random
+import string
 
 
 def jinja_replace(s, config, relaxed: bool = False, delim: tuple[str, str] = ("{{", "}}")):
@@ -20,3 +22,21 @@ def jinja_replace(s, config, relaxed: bool = False, delim: tuple[str, str] = ("{
         raise KeyError(f"{k} is not in the supplied replacement variables")
 
     return re.sub(re.escape(delim[0]) + r"\s*(\w+)\s*" + re.escape(delim[1]), handle_match, s)
+
+
+def randomsuffix(length: int):
+    letters = string.ascii_lowercase
+    return "".join(random.choice(letters) for _ in range(length))
+
+
+def qw(s: str) -> list[str]:
+    return s.split()
+
+
+def split_host(host: str) -> tuple[str | None, int | None]:
+    if not host:
+        return (None, None)
+    res = host.split(":", 1)
+    if len(res) == 1:
+        return (res[0], None)
+    return (res[0], int(res[1]))

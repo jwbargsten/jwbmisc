@@ -244,3 +244,25 @@ class TestGetKeeperPassword:
 
         with pytest.raises(KeyError, match="Failed to sync"):
             get_keeper_password("RECORD123", "password")
+
+    # def test_keeper_url(self, mocker):
+    #     mock_keeper = mocker.patch("jwbmisc.passwd._keeper_password")
+    #     mock_keeper.return_value = "keeper_password"
+
+    #     result = pw.get_pass("keeper://RECORD123/field/password")
+    #     assert result == "keeper_password"
+    #     mock_keeper.assert_called_once_with("RECORD123", "field/password")
+
+    # def test_keeper_url_invalid_format_raises(self):
+    #     with pytest.raises(KeyError, match="Invalid keeper:// format"):
+    #         pw.get_pass("keeper://RECORD123")
+
+
+# class TestKeeperPassword:
+#     def test_delegates_to_get_keeper_password(self, mocker):
+#         mock_get = mocker.patch("jwbmisc.keeper.get_keeper_password")
+#         mock_get.return_value = "keeper_secret"
+
+#         result = _keeper_password("RECORD_UID", "field/path")
+#         assert result == "keeper_secret"
+#         mock_get.assert_called_once_with("RECORD_UID", "field/path")

@@ -1,5 +1,5 @@
-#!/bin/bash
-# Fake pass script for testing run_cmd and passwd
+#!/usr/bin/env bash
+
 case "$2" in
     "test/secret") echo "password123";;
     "test/multiline") printf "line1\nline2\nline3";;

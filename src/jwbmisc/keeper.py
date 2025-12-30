@@ -5,7 +5,7 @@ from time import sleep
 from keepercommander.params import KeeperParams
 from keepercommander.config_storage import loader
 import os
-from .util import ask
+from .interactive import ask
 from pathlib import Path
 import webbrowser
 from keepercommander.auth import login_steps

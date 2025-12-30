@@ -18,12 +18,6 @@ def env_var():
 
 
 @pytest.fixture
-def fake_pass(monkeypatch):
-    tests_dir = Path(__file__).parent
-    monkeypatch.setenv("PATH", f"{tests_dir}:{os.environ['PATH']}")
-
-
-@pytest.fixture
 def fake_fzf(monkeypatch):
     tests_dir = Path(__file__).parent
     monkeypatch.setenv("PATH", f"{tests_dir}:{os.environ['PATH']}")

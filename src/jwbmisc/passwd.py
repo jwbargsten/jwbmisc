@@ -2,6 +2,8 @@ import subprocess as sp
 import os
 from pathlib import Path
 
+PASS_BIN = os.environ.get("JWBMISC_PASS_BIN", "pass")
+
 
 def get_pass(*pass_keys: str):
     if not pass_keys:
@@ -48,7 +50,7 @@ def get_pass(*pass_keys: str):
 
 
 def _call_unix_pass(key, lnum=1):
-    proc = sp.Popen(["pass", "show", key], stdout=sp.PIPE, stderr=sp.PIPE, encoding="utf-8")
+    proc = sp.Popen([PASS_BIN, "show", key], stdout=sp.PIPE, stderr=sp.PIPE, encoding="utf-8")
     value, stderr = proc.communicate()
 
     if proc.returncode != 0:
