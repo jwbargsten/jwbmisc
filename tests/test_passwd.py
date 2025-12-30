@@ -56,7 +56,7 @@ class TestGetPass:
             get_pass(f"file://{tmp_path}")
 
     def test_keyring_url(self, mocker):
-        mock_keyring = mocker.patch.dict("sys.modules", {"keyring": mocker.MagicMock()})
+        mocker.patch.dict("sys.modules", {"keyring": mocker.MagicMock()})
         import sys
 
         sys.modules["keyring"].get_password.return_value = "keyring_password"

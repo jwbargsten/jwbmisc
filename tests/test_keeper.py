@@ -69,7 +69,7 @@ class TestMinimalKeeperUI:
 
     def test_on_sso_redirect(self, mocker):
         mock_webbrowser = mocker.patch("jwbmisc.keeper.webbrowser")
-        mock_ask = mocker.patch("jwbmisc.keeper.ask", return_value="sso_token_123")
+        mocker.patch("jwbmisc.keeper.ask", return_value="sso_token_123")
 
         step = mocker.MagicMock()
         step.sso_login_url = "https://sso.example.com"
@@ -92,11 +92,9 @@ class TestMinimalKeeperUI:
             ui.on_sso_redirect(step)
 
     def test_on_two_factor(self, mocker):
-        mock_ask = mocker.patch("jwbmisc.keeper.ask", return_value="123456")
+        mocker.patch("jwbmisc.keeper.ask", return_value="123456")
         mock_channel = mocker.MagicMock()
-        mock_channel.channel_type = mocker.patch(
-            "jwbmisc.keeper.login_steps.TwoFactorChannel"
-        ).Authenticator
+        mock_channel.channel_type = mocker.patch("jwbmisc.keeper.login_steps.TwoFactorChannel").Authenticator
         mock_channel.channel_uid = "channel_123"
 
         step = mocker.MagicMock()
@@ -195,7 +193,6 @@ class TestPerformKeeperLogin:
 
 class TestGetKeeperPassword:
     def test_successful_password_retrieval(self, mocker, tmp_path):
-        config_file = tmp_path / ".config" / "keeper" / "config.json"
         mocker.patch("jwbmisc.keeper.Path.home", return_value=tmp_path)
 
         mock_params = mocker.MagicMock()
