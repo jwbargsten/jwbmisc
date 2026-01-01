@@ -9,6 +9,7 @@ def run_cmd(
     stdin=None,
     contains_sensitive_data=False,
     timeout=20,
+    cwd=None,
     decode=True,
     dry_run=False,
 ):
@@ -21,6 +22,9 @@ def run_cmd(
         stdin = stdin.encode("utf-8")
 
     cmd = [str(v) for v in cmd]
+
+    if cwd is not None:
+        cwd = str(cwd)
 
     if dry_run:
         print(cmd)
@@ -35,6 +39,7 @@ def run_cmd(
             env=env,
             check=True,
             timeout=timeout,
+            cwd=cwd,
             input=stdin,
         )
     except sp.CalledProcessError as ex:
