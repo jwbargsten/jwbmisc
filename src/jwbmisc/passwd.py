@@ -1,5 +1,6 @@
 import subprocess as sp
 import os
+from urllib.parse import urlparse, parse_qs
 from pathlib import Path
 
 PASS_BIN = os.environ.get("JWBMISC_PASS_BIN", "pass")
@@ -11,11 +12,18 @@ def get_pass(*pass_keys: str):
 
     for pass_key in pass_keys:
         if pass_key.startswith("pass://"):
-            k = pass_key.removeprefix("pass://")
-            lnum = 1
-            if "?" in k:
-                k, lnum = k.rsplit("?", 1)
-            return _call_unix_pass(k, int(lnum))
+            url = urlparse(pass_key, scheme="pass")
+            query = parse_qs(url.query)
+            lines = query.get("lines", ["1"])[0]
+            format = query.get("format", ["raw"])[0]
+            if lines == "all":
+                lines = None
+            else:
+                lines = [int(n) - 1 for n in lines.split(",")]
+            netloc = url.netloc.rstrip("/")
+            path = url.path.lstrip("/")
+            key = f"{netloc}/{path}".lstrip("/")
+            return _call_unix_pass(key, lines, format)
 
         if pass_key.startswith("env://"):
             env_var = pass_key.removeprefix("env://").replace("/", "__")
@@ -47,26 +55,25 @@ def get_pass(*pass_keys: str):
     raise KeyError(f"Could not acquire password from one of {pass_keys}")
 
 
-def _call_unix_pass(key, lnum=1):
+def _call_unix_pass(key: str, idcs: list[int] | None = None, format: str = "list") -> str | list[str] | None:
     proc = sp.Popen([PASS_BIN, "show", key], stdout=sp.PIPE, stderr=sp.PIPE, encoding="utf-8")
     value, stderr = proc.communicate()
 
     if proc.returncode != 0:
         raise KeyError(f"pass failed for '{key}': {stderr.strip()}")
 
-    if lnum is None or lnum == 0:
-        return value.strip()
+    if idcs is None or idcs == [-1]:
+        return value.rstrip()
+
     lines = value.splitlines()
-
     try:
-        if isinstance(lnum, list):
-            pw = [lines[ln - 1].strip() for ln in lnum]
-        else:
-            pw = lines[lnum - 1].strip()
+        lines = [lines[idx] for idx in idcs]
     except IndexError:
-        raise KeyError(f"could not retrieve lines {lnum} for {key}")
+        raise KeyError(f"could not retrieve line idcs {idcs} for {key}")
 
-    return pw
+    if format == "list":
+        return lines
+    return "\n".join(lines)
 
 
 def _keeper_password(record_uid: str, field_path: str | None = None) -> str:

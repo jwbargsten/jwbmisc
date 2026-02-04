@@ -13,18 +13,18 @@ class TestUnixPass:
         assert result == "password123"
 
     def test_pass_url_with_line_number(self):
-        result = pw.get_pass("pass://test/multiline?2")
+        result = pw.get_pass("pass://test/multiline?lines=2")
         assert result == "line2"
 
     def test_pass_url_with_all_lines(self):
-        result = pw.get_pass("pass://test/multiline?0")
+        result = pw.get_pass("pass://test/multiline?lines=all&format=list")
         assert "line1" in result
         assert "line2" in result
         assert "line3" in result
 
     def test_pass_url_with_invalid_line_number(self):
         with pytest.raises(KeyError):
-            pw.get_pass("pass://test/multiline?99")
+            pw.get_pass("pass://test/multiline?lines=99")
 
 
 class TestGetPass:
