@@ -63,7 +63,10 @@ def _call_unix_pass(key: str, idcs: list[int] | None = None, format: str = "list
         raise KeyError(f"pass failed for '{key}': {stderr.strip()}")
 
     if idcs is None or idcs == [-1]:
-        return value.rstrip()
+        if format == "raw":
+            return value.rstrip()
+        else:
+            return value.rstrip().splitlines()
 
     lines = value.splitlines()
     try:
