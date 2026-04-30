@@ -65,11 +65,7 @@ def goo(
         1
     """
     if sep:
-        keys = tuple(
-            part
-            for k in keys
-            for part in (k.split(sep) if isinstance(k, str) else [k])
-        )
+        keys = tuple(part for k in keys for part in (k.split(sep) if isinstance(k, str) else [k]))
 
     res = d
     for i, k in enumerate(keys):
@@ -98,14 +94,8 @@ def goo(
         if nxt is _MISSING:
             if default is _MISSING:
                 traversed = keys[: i + 1]
-                path = (
-                    sep.join(str(x) for x in traversed)
-                    if sep
-                    else ", ".join(str(x) for x in traversed)
-                )
-                raise ValueError(
-                    f"component {k!r} not found at path {path!r}"
-                )
+                path = sep.join(str(x) for x in traversed) if sep else ", ".join(str(x) for x in traversed)
+                raise ValueError(f"component {k!r} not found at path {path!r}")
             return default
         res = nxt
     return res
