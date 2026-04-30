@@ -23,14 +23,14 @@ class TestGoo:
         d = {"a": 1}
         assert goo(d, "b", default="missing") == "missing"
 
-    def test_missing_key_returns_none_by_default(self):
+    def test_missing_key_returns_none_when_default_is_none(self):
         d = {"a": 1}
-        assert goo(d, "b") is None
+        assert goo(d, "b", default=None) is None
 
-    def test_raise_on_default(self):
+    def test_missing_key_raises_when_no_default(self):
         d = {"a": 1}
         with pytest.raises(ValueError, match="does not exist"):
-            goo(d, "b", raise_on_default=True)
+            goo(d, "b")
 
     def test_none_in_path_returns_default(self):
         d = {"a": None}
