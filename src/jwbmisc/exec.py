@@ -1,24 +1,27 @@
 import subprocess as sp
 import os
+from pathlib import Path
 
 
 def run_cmd(
-    cmd,
-    env=None,
-    capture=False,
-    stdin=None,
-    contains_sensitive_data=False,
-    timeout=20,
-    cwd=None,
-    decode=True,
-    dry_run=False,
-):
+    cmd: list[str],
+    env: dict[str, str | int] | None = None,
+    capture: bool = False,
+    stdin: bytes | str | None = None,
+    contains_sensitive_data: bool = False,
+    timeout: int = 300,
+    cwd: str | Path | None = None,
+    decode: bool = True,
+    dry_run: bool = False,
+) -> tuple[str, str] | tuple[bytes, bytes] | None:
+    if isinstance(cmd, str):
+        raise TypeError("cmd must be a list of arguments, not a string")
     if env is None:
         env = {}
     env = {**os.environ, **env}
-    env.pop("__PYVENV_LAUNCHER__", None)
+    _ = env.pop("__PYVENV_LAUNCHER__", None)
 
-    if stdin is not None:
+    if stdin is not None and not isinstance(stdin, bytes):
         stdin = stdin.encode("utf-8")
 
     cmd = [str(v) for v in cmd]
@@ -29,8 +32,10 @@ def run_cmd(
     if dry_run:
         print(cmd)
         if capture:
-            return ("", "")
+            return ("", "") if decode else (b"", b"")
         return
+
+    redacted = "<redacted>" if decode else b"<redacted>"
 
     try:
         res = sp.run(
@@ -43,10 +48,15 @@ def run_cmd(
             input=stdin,
         )
     except sp.CalledProcessError as ex:
-        redacted_bytes = "<redacted>".encode("utf-8")
-        out = redacted_bytes if contains_sensitive_data else ex.output
-        err = redacted_bytes if contains_sensitive_data else ex.stderr
-        raise sp.CalledProcessError(ex.returncode, ex.cmd, out, err) from None
+        if contains_sensitive_data:
+            ex.stdout = redacted if decode else b"<redacted>"
+            ex.stderr = redacted if decode else b"<redacted>"
+        raise
+    except sp.TimeoutExpired as ex:
+        if contains_sensitive_data:
+            ex.stdout = redacted if decode else b"<redacted>"
+            ex.stderr = redacted if decode else b"<redacted>"
+        raise
 
     if not capture:
         return None
