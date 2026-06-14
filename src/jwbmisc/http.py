@@ -4,12 +4,16 @@
 
 import requests as rq
 
+
 class BearerAuth(rq.auth.AuthBase):
     """auth=BearerAuth('s3cr3t')"""
+
     token: str
+
     def __init__(self, token):
         super().__init__()
         self.token = token
+
     def __call__(self, req):
         req.headers["Authorization"] = "Bearer " + self.token
         return req
