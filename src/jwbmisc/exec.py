@@ -5,11 +5,11 @@ from pathlib import Path
 
 def run_cmd(
     cmd: list[str],
-    env: dict[str, str | int] | None = None,
+    env: dict[str, str] | None = None,
     capture: bool = False,
     stdin: bytes | str | None = None,
     contains_sensitive_data: bool = False,
-    timeout: int = 300,
+    timeout: float | None = 300,
     cwd: str | Path | None = None,
     decode: bool = True,
     dry_run: bool = False,
@@ -49,13 +49,8 @@ def run_cmd(
         )
     except sp.CalledProcessError as ex:
         if contains_sensitive_data:
-            ex.stdout = redacted if decode else b"<redacted>"
-            ex.stderr = redacted if decode else b"<redacted>"
-        raise
-    except sp.TimeoutExpired as ex:
-        if contains_sensitive_data:
-            ex.stdout = redacted if decode else b"<redacted>"
-            ex.stderr = redacted if decode else b"<redacted>"
+            ex.stdout = redacted
+            ex.stderr = redacted
         raise
 
     if not capture:
