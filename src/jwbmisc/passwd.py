@@ -32,8 +32,9 @@ def get_pass(*pass_keys: str, interactive: bool = True) -> str | list[str]:
     URLs whose manager is not available are skipped, failures fall through to the
     next URL. If all fail, a ``KeyError`` listing every reason is raised.
 
-    With ``interactive=False``, backends never prompt (e.g. Keeper is skipped when
-    there is no stored session instead of starting a login).
+    With ``interactive=False``, backends must not prompt and fall through instead:
+    Keeper only uses a stored session, pass/gpg fails if the passphrase is not cached
+    in gpg-agent. Best effort for keyring: the OS may still show an access dialog.
     """
     if not pass_keys:
         raise ValueError("no pass keys supplied")
@@ -75,7 +76,7 @@ def _pass_available() -> bool:
     return shutil.which(PASS_BIN) is not None
 
 
-def _pass_get(pass_key: str, _interactive: bool) -> str | list[str]:
+def _pass_get(pass_key: str, interactive: bool) -> str | list[str]:
     url = urlparse(pass_key, scheme="pass")
     query = parse_qs(url.query)
     lines_q = query.get("lines", ["1"])[0]
@@ -84,11 +85,30 @@ def _pass_get(pass_key: str, _interactive: bool) -> str | list[str]:
     netloc = url.netloc.rstrip("/")
     path = url.path.lstrip("/")
     key = f"{netloc}/{path}".lstrip("/")
-    return _call_unix_pass(key, lines, format)
+    return _call_unix_pass(key, lines, format, interactive=interactive)
 
 
-def _call_unix_pass(key: str, idcs: list[int] | None = None, format: str = "list") -> str | list[str]:
-    proc = sp.Popen([PASS_BIN, "show", key], stdout=sp.PIPE, stderr=sp.PIPE, encoding="utf-8")
+def _pass_env(interactive: bool) -> dict[str, str] | None:
+    if interactive:
+        return None
+    # pass hands PASSWORD_STORE_GPG_OPTS to gpg; with --pinentry-mode error gpg fails
+    # instead of prompting when the passphrase is not cached in gpg-agent
+    env = os.environ.copy()
+    opts = env.get("PASSWORD_STORE_GPG_OPTS", "")
+    env["PASSWORD_STORE_GPG_OPTS"] = f"{opts} --pinentry-mode error".strip()
+    return env
+
+
+def _call_unix_pass(
+    key: str, idcs: list[int] | None = None, format: str = "list", interactive: bool = True
+) -> str | list[str]:
+    proc = sp.Popen(
+        [PASS_BIN, "show", key],
+        stdout=sp.PIPE,
+        stderr=sp.PIPE,
+        encoding="utf-8",
+        env=_pass_env(interactive),
+    )
     value, stderr = proc.communicate()
 
     if proc.returncode != 0:

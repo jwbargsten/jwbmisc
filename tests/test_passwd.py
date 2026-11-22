@@ -22,6 +22,19 @@ class TestUnixPass:
         assert "line2" in result
         assert "line3" in result
 
+    def test_interactive_leaves_gpg_opts_alone(self, monkeypatch):
+        monkeypatch.delenv("PASSWORD_STORE_GPG_OPTS", raising=False)
+        assert pw.get_pass("pass://test/gpg-opts") == "<unset>"
+
+    def test_non_interactive_disables_pinentry(self, monkeypatch):
+        monkeypatch.delenv("PASSWORD_STORE_GPG_OPTS", raising=False)
+        assert pw.get_pass("pass://test/gpg-opts", interactive=False) == "--pinentry-mode error"
+
+    def test_non_interactive_keeps_existing_gpg_opts(self, monkeypatch):
+        monkeypatch.setenv("PASSWORD_STORE_GPG_OPTS", "--armor")
+        result = pw.get_pass("pass://test/gpg-opts", interactive=False)
+        assert result == "--armor --pinentry-mode error"
+
     def test_pass_url_with_invalid_line_number(self):
         with pytest.raises(KeyError):
             pw.get_pass("pass://test/multiline?lines=99")
