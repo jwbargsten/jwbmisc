@@ -116,3 +116,9 @@ class TestResilientLoads:
 
     def test_none_input_returns_none(self):
         assert resilient_loads(None) is None
+
+    def test_invalid_utf8_bytes_returns_none(self):
+        assert resilient_loads(b"\xff\xfe{") is None
+
+    def test_wrong_type_returns_none(self):
+        assert resilient_loads(123) is None

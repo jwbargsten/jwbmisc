@@ -148,7 +148,8 @@ def get_password(record_uid: str, field_path: str | None, interactive: bool = Tr
             loader.load_config_properties(params)
             if not params.session_token:
                 raise ValueError("No session token")
-        except Exception:
+        # anything wrong with the stored session (missing, corrupt, outdated format) -> log in again
+        except Exception:  # noqa: BLE001
             _login(params, interactive)
     else:
         _login(params, interactive)

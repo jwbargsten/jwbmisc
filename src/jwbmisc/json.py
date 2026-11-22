@@ -42,5 +42,6 @@ def resilient_loads(data):
         return None
     try:
         return json.loads(data)
-    except Exception:
+    # ValueError covers JSONDecodeError and UnicodeDecodeError, TypeError wrong input types
+    except (ValueError, TypeError):
         return None
