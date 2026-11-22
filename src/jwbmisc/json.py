@@ -1,8 +1,8 @@
-import re
-from typing import Any
-import json
-from pathlib import Path
 import gzip
+import json
+import re
+from pathlib import Path
+from typing import Any
 
 
 def jsonc_loads(data: str):

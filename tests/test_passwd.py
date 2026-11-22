@@ -1,8 +1,9 @@
 # pyright: basic
+from pathlib import Path
+
 import pytest
 
 import jwbmisc.passwd as pw
-from pathlib import Path
 
 pw.PASS_BIN = str((Path(__file__).parent / "pass").absolute())
 

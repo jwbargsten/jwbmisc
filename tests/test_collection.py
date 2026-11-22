@@ -1,4 +1,5 @@
 import pytest
+
 from jwbmisc.collection import goo
 
 

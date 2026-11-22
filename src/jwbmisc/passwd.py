@@ -2,10 +2,10 @@ import importlib.util
 import os
 import shutil
 import subprocess as sp
+from collections.abc import Callable
 from dataclasses import dataclass
 from logging import getLogger
 from pathlib import Path
-from collections.abc import Callable
 from urllib.parse import parse_qs, urlparse
 
 logger = getLogger(__name__)

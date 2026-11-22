@@ -1,6 +1,6 @@
 import pytest
 
-from jwbmisc.string import jinja_replace, qw, split_host, randomsuffix
+from jwbmisc.string import jinja_replace, qw, randomsuffix, split_host
 
 
 class TestJinjaReplace:

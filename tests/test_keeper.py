@@ -1,12 +1,12 @@
 # pyright: basic
 import pytest
+from keepercommander import utils, vault
 
-from keepercommander import vault, utils
 from jwbmisc.keeper import (
     MinimalKeeperUI,
     extract_record_field,
-    perform_login,
     get_password,
+    perform_login,
 )
 
 

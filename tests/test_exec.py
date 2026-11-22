@@ -1,8 +1,8 @@
 # pyright: basic
 import subprocess
+from pathlib import Path
 
 import pytest
-from pathlib import Path
 
 from jwbmisc.exec import run_cmd
 
@@ -96,7 +96,7 @@ class TestRunCmd:
     # output is assembled at runtime so "secret" only appears in the output, not in the
     # command line (which is part of the exception message); exec, so the kill on
     # timeout hits sleep itself and the pipes close right away
-    TIMEOUT_CMD = ["bash", "-c", "printf '%s%s\\n' sec ret; printf '%s%s\\n' sec ret-err >&2; exec sleep 5"]
+    TIMEOUT_CMD = ("bash", "-c", "printf '%s%s\\n' sec ret; printf '%s%s\\n' sec ret-err >&2; exec sleep 5")
 
     def test_timeout_output_decoded(self):
         with pytest.raises(subprocess.TimeoutExpired) as exc_info:
