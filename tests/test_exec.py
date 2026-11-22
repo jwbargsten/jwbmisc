@@ -73,6 +73,17 @@ class TestRunCmd:
     def test_sensitive_data_redacted(self):
         with pytest.raises(subprocess.CalledProcessError) as exc_info:
             run_cmd([PASS_BIN, "show", "test/missing"], capture=True, contains_sensitive_data=True)
+        assert exc_info.value.stdout == "<redacted>"
+        assert exc_info.value.stderr == "<redacted>"
+
+    def test_sensitive_data_redacted_as_bytes_without_decode(self):
+        with pytest.raises(subprocess.CalledProcessError) as exc_info:
+            run_cmd(
+                [PASS_BIN, "show", "test/missing"],
+                capture=True,
+                contains_sensitive_data=True,
+                decode=False,
+            )
         assert exc_info.value.stdout == b"<redacted>"
         assert exc_info.value.stderr == b"<redacted>"
 
