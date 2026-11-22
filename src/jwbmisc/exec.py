@@ -48,16 +48,17 @@ def run_cmd(
             input=stdin,
         )
     except (sp.CalledProcessError, sp.TimeoutExpired) as ex:
-        # TimeoutExpired carries the partial output collected before the kill
+        # TimeoutExpired carries the partial output collected before the kill. Its stubs
+        # type stdout/stderr as bytes, but with decode=True we deliberately store str.
         if contains_sensitive_data:
-            ex.stdout = redacted
-            ex.stderr = redacted
+            ex.stdout = redacted  # type: ignore
+            ex.stderr = redacted  # type: ignore
         elif decode:
             # errors="replace": a decode error must not hide the original failure
             if isinstance(ex.stdout, bytes):
-                ex.stdout = ex.stdout.decode("utf-8", errors="replace")
+                ex.stdout = ex.stdout.decode("utf-8", errors="replace")  # type: ignore
             if isinstance(ex.stderr, bytes):
-                ex.stderr = ex.stderr.decode("utf-8", errors="replace")
+                ex.stderr = ex.stderr.decode("utf-8", errors="replace")  # type: ignore
         raise
 
     if not capture:
