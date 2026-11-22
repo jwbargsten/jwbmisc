@@ -70,6 +70,29 @@ class TestRunCmd:
             run_cmd([PASS_BIN, "show", "test/missing"], capture=True)
         assert exc_info.value.returncode == 1
 
+    def test_called_process_error_output_decoded(self):
+        with pytest.raises(subprocess.CalledProcessError) as exc_info:
+            run_cmd([PASS_BIN, "show", "test/missing"], capture=True)
+        assert exc_info.value.stdout == ""
+        assert exc_info.value.stderr == "Error: not found\n"
+
+    def test_called_process_error_output_bytes_without_decode(self):
+        with pytest.raises(subprocess.CalledProcessError) as exc_info:
+            run_cmd([PASS_BIN, "show", "test/missing"], capture=True, decode=False)
+        assert exc_info.value.stderr == b"Error: not found\n"
+
+    def test_called_process_error_invalid_utf8_does_not_mask_error(self):
+        with pytest.raises(subprocess.CalledProcessError) as exc_info:
+            run_cmd(["bash", "-c", "printf 'bad \\xff' >&2; exit 3"], capture=True)
+        assert exc_info.value.returncode == 3
+        assert exc_info.value.stderr == "bad �"
+
+    def test_called_process_error_without_capture(self):
+        with pytest.raises(subprocess.CalledProcessError) as exc_info:
+            run_cmd(["bash", "-c", "exit 2"])
+        assert exc_info.value.stdout is None
+        assert exc_info.value.stderr is None
+
     def test_sensitive_data_redacted(self):
         with pytest.raises(subprocess.CalledProcessError) as exc_info:
             run_cmd([PASS_BIN, "show", "test/missing"], capture=True, contains_sensitive_data=True)

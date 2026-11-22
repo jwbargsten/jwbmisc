@@ -51,6 +51,12 @@ def run_cmd(
         if contains_sensitive_data:
             ex.stdout = redacted
             ex.stderr = redacted
+        elif decode:
+            # errors="replace": a decode error must not hide the original failure
+            if isinstance(ex.stdout, bytes):
+                ex.stdout = ex.stdout.decode("utf-8", errors="replace")
+            if isinstance(ex.stderr, bytes):
+                ex.stderr = ex.stderr.decode("utf-8", errors="replace")
         raise
 
     if not capture:
