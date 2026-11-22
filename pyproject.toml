@@ -33,6 +33,8 @@ homepage = "https://github.com/jwbargsten/jwbmisc"
 repository = "https://github.com/jwbargsten/jwbmisc"
 
 [project.optional-dependencies]
+keeper = ["keepercommander"]
+keyring = ["keyring"]
 dev = [
     "ruff",
     "pytest>=7",

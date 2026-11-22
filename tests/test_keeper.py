@@ -1,5 +1,7 @@
 # pyright: basic
 import pytest
+
+pytest.importorskip("keepercommander")
 from keepercommander import utils, vault
 
 from jwbmisc.keeper import (

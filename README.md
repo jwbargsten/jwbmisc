@@ -18,13 +18,17 @@ token = get_pass(
 )
 ```
 
+Without `pip install jwbmisc[keeper]` or `jwbmisc[keyring]` (or the `pass` and `op` binaries), the
+corresponding URLs are simply skipped; importing `jwbmisc` never fails because of a missing optional package.
+
 This lets the same code run unchanged on machines with different password managers: the laptop gets the
 secret from Keeper, a server with only `pass` uses the second URL, and CI falls through to the env var.
 
 ### Fallback rules
 
 - **Manager not available:** the URL is skipped. `pass` needs the binary on `PATH`, `keyring` needs the
-  module and a usable OS keyring, `keeper` needs `keepercommander`. `env://` and `file://` are always tried.
+  module and a usable OS keyring, `keeper` needs `keepercommander` (an installed but broken package counts
+  as not available), `op` needs the 1Password CLI on `PATH`. `env://` and `file://` are always tried.
 - **Secret not found or lookup failed:** `get_pass` moves on to the next URL.
 - **All URLs failed:** a single `KeyError` lists every URL and why it failed.
 - **Unknown scheme:** `ValueError` is raised right away, even if an earlier URL would have worked.
@@ -38,18 +42,23 @@ secret from Keeper, a server with only `pass` uses the second URL, and CI falls 
 | `env://` | `env://MY/NESTED/VAR` | `/` becomes `__`, so this reads `MY__NESTED__VAR`. |
 | `file://` | `file:///run/secrets/token` | Content is stripped of surrounding whitespace. |
 | `keyring://` | `keyring://service/username` | Requires the `keyring` package. |
+| `op://` | `op://Private/GitHub/token` | A [1Password secret reference](https://www.1password.dev/cli/secret-reference-syntax), passed to `op read` as is: `op://vault/item/[section/]field`, optionally with `?attribute=otp` etc. Binary can be changed with `JWBMISC_OP_BIN`. |
 | `keeper://` | `keeper://RECORD_UID/password` | Record UID, then an optional field type or label. Requires `keepercommander`; the session is stored in `~/.config/jwbmisc/keeper.json`. Login reads `KEEPER_USERNAME` and `KEEPER_SERVER` if set. |
 
 ### Interactive vs. non-interactive
 
 `get_pass(..., interactive=True)` is the default and meant for CLI apps with a terminal: Keeper may ask for
-SSO, 2FA or device approval, and gpg may show pinentry for `pass`.
+SSO, 2FA or device approval, gpg may show pinentry for `pass`, and 1Password may ask for Touch ID or a sign-in
+(its output goes straight to the terminal in this mode).
 
 With `interactive=False`, managers must not prompt and fall through instead:
 
 - **Keeper** only uses a stored session; if a login would be needed, the URL is skipped.
 - **pass** adds `--pinentry-mode error` to `PASSWORD_STORE_GPG_OPTS`, so gpg fails instead of prompting when
   the passphrase is not cached in gpg-agent. A cached passphrase still works.
+- **1Password** runs `op` with `OP_BIOMETRIC_UNLOCK_ENABLED=false` and no stdin, so the desktop app is not
+  asked to unlock (no Touch ID dialog). It then only works with `OP_SERVICE_ACCOUNT_TOKEN`, a Connect
+  server (`OP_CONNECT_HOST`/`OP_CONNECT_TOKEN`) or an `OP_SESSION` from a manual sign-in.
 - **keyring** is best effort: the OS (e.g. the macOS Keychain) may still show an access dialog.
 
 ```python
