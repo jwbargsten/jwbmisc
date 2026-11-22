@@ -93,6 +93,24 @@ class TestRunCmd:
         assert exc_info.value.stdout is None
         assert exc_info.value.stderr is None
 
+    # output is assembled at runtime so "secret" only appears in the output, not in the
+    # command line (which is part of the exception message); exec, so the kill on
+    # timeout hits sleep itself and the pipes close right away
+    TIMEOUT_CMD = ["bash", "-c", "printf '%s%s\\n' sec ret; printf '%s%s\\n' sec ret-err >&2; exec sleep 5"]
+
+    def test_timeout_output_decoded(self):
+        with pytest.raises(subprocess.TimeoutExpired) as exc_info:
+            run_cmd(self.TIMEOUT_CMD, capture=True, timeout=0.5)
+        assert exc_info.value.stdout == "secret\n"
+        assert exc_info.value.stderr == "secret-err\n"
+
+    def test_timeout_sensitive_data_redacted(self):
+        with pytest.raises(subprocess.TimeoutExpired) as exc_info:
+            run_cmd(self.TIMEOUT_CMD, capture=True, timeout=0.5, contains_sensitive_data=True)
+        assert exc_info.value.stdout == "<redacted>"
+        assert exc_info.value.stderr == "<redacted>"
+        assert "secret" not in str(exc_info.value)
+
     def test_sensitive_data_redacted(self):
         with pytest.raises(subprocess.CalledProcessError) as exc_info:
             run_cmd([PASS_BIN, "show", "test/missing"], capture=True, contains_sensitive_data=True)

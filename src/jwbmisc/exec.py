@@ -47,7 +47,8 @@ def run_cmd(
             cwd=cwd,
             input=stdin,
         )
-    except sp.CalledProcessError as ex:
+    except (sp.CalledProcessError, sp.TimeoutExpired) as ex:
+        # TimeoutExpired carries the partial output collected before the kill
         if contains_sensitive_data:
             ex.stdout = redacted
             ex.stderr = redacted
