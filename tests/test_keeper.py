@@ -179,7 +179,7 @@ class TestPerformKeeperLogin:
         params = mocker.MagicMock()
         params.user = None
 
-        with pytest.raises(KeyError, match="cancelled by user"):
+        with pytest.raises(KeyboardInterrupt):
             perform_login(params)
 
 

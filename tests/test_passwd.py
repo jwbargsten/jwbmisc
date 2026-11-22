@@ -72,13 +72,79 @@ class TestGetPass:
             pw.get_pass(f"file://{tmp_path}")
 
     def test_keyring_url(self, mocker):
+        mocker.patch("keyring.get_keyring")
         mocker.patch("keyring.get_password", return_value="keyring_password")
 
         result = pw.get_pass("keyring://service/username")
         assert result == "keyring_password"
 
     def test_keyring_url_not_found_raises(self, mocker):
+        mocker.patch("keyring.get_keyring")
         mocker.patch("keyring.get_password", return_value=None)
 
         with pytest.raises(KeyError):
             pw.get_pass("keyring://service/username")
+
+
+class TestFallback:
+    def test_unknown_scheme_raises_value_error(self):
+        with pytest.raises(ValueError, match="unsupported pass key"):
+            pw.get_pass("nope://foo")
+
+    def test_unknown_scheme_raises_even_if_earlier_key_succeeds(self, env_var):
+        env_var(MY_PASSWORD="secret123")
+        with pytest.raises(ValueError):
+            pw.get_pass("env://MY_PASSWORD", "nope://foo")
+
+    def test_falls_through_to_next_key(self, env_var):
+        env_var(MY_PASSWORD="secret123")
+        assert pw.get_pass("pass://test/missing", "env://MY_PASSWORD") == "secret123"
+
+    def test_first_success_wins(self, env_var):
+        env_var(MY_PASSWORD="secret123")
+        assert pw.get_pass("pass://test/secret", "env://MY_PASSWORD") == "password123"
+
+    def test_skips_unavailable_backend(self, monkeypatch, env_var):
+        env_var(MY_PASSWORD="secret123")
+        monkeypatch.setattr(pw, "PASS_BIN", "/nonexistent/pass")
+        assert pw.get_pass("pass://test/secret", "env://MY_PASSWORD") == "secret123"
+
+    def test_all_fail_lists_every_reason(self, monkeypatch, tmp_path):
+        monkeypatch.setattr(pw, "PASS_BIN", "/nonexistent/pass")
+        with pytest.raises(KeyError) as exc:
+            pw.get_pass("pass://test/secret", "env://NONEXISTENT_VAR_12345", f"file://{tmp_path}/x")
+        msg = exc.value.args[0]
+        assert "pass is not available" in msg
+        assert "is not in the env" in msg
+        assert "does not exist" in msg
+
+
+class TestKeeperUrl:
+    def test_keeper_url_with_field(self, mocker):
+        mock_keeper = mocker.patch("jwbmisc.keeper.get_password", return_value="keeper_password")
+        assert pw.get_pass("keeper://RECORD123/field/password") == "keeper_password"
+        mock_keeper.assert_called_once_with("RECORD123", "field/password", interactive=True)
+
+    def test_keeper_url_without_field(self, mocker):
+        mock_keeper = mocker.patch("jwbmisc.keeper.get_password", return_value="keeper_password")
+        pw.get_pass("keeper://RECORD123", interactive=False)
+        mock_keeper.assert_called_once_with("RECORD123", None, interactive=False)
+
+    def test_non_interactive_keeper_without_session_falls_through(self, mocker, env_var):
+        from jwbmisc import keeper
+
+        env_var(MY_PASSWORD="secret123")
+        mocker.patch.object(keeper, "CONFIG_FILE", mocker.MagicMock(exists=lambda: False))
+        login = mocker.patch("jwbmisc.keeper.perform_login")
+
+        result = pw.get_pass("keeper://RECORD123/password", "env://MY_PASSWORD", interactive=False)
+
+        assert result == "secret123"
+        login.assert_not_called()
+
+    def test_ctrl_c_aborts_instead_of_falling_through(self, mocker, env_var):
+        env_var(MY_PASSWORD="secret123")
+        mocker.patch("jwbmisc.keeper.get_password", side_effect=KeyboardInterrupt())
+
+        with pytest.raises(KeyboardInterrupt):
+            pw.get_pass("keeper://RECORD123/password", "env://MY_PASSWORD")
