@@ -126,13 +126,17 @@ def perform_login(params):
 
     try:
         api.login(params, login_ui=MinimalKeeperUI())
-    except KeyboardInterrupt:
-        raise KeyError("\nKeeper login cancelled by user.") from None
     except Exception as e:
         raise KeyError(f"Keeper login failed: {e}") from e
 
 
-def get_password(record_uid: str, field_path: str | None) -> str:
+def _login(params, interactive: bool):
+    if not interactive:
+        raise KeyError("no valid Keeper session and interactive login is disabled")
+    perform_login(params)
+
+
+def get_password(record_uid: str, field_path: str | None, interactive: bool = True) -> str:
     CONFIG_FILE.parent.mkdir(parents=True, exist_ok=True)
 
     params = KeeperParams(config_filename=str(CONFIG_FILE))
@@ -144,9 +148,9 @@ def get_password(record_uid: str, field_path: str | None) -> str:
             if not params.session_token:
                 raise ValueError("No session token")
         except Exception:
-            perform_login(params)
+            _login(params, interactive)
     else:
-        perform_login(params)
+        _login(params, interactive)
 
     try:
         api.sync_down(params)

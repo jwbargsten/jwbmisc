@@ -3,6 +3,7 @@
 case "$2" in
     "test/secret") echo "password123";;
     "test/multiline") printf "line1\nline2\nline3";;
+    "test/gpg-opts") echo "${PASSWORD_STORE_GPG_OPTS-<unset>}";;
     "test/missing") echo "Error: not found" >&2; exit 1;;
     *) echo "Error: unknown key $2" >&2; exit 1;;
 esac
