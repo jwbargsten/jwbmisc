@@ -1,4 +1,4 @@
-import importlib.util
+import importlib
 import os
 import shutil
 import subprocess as sp
@@ -11,6 +11,7 @@ from urllib.parse import parse_qs, urlparse
 logger = getLogger(__name__)
 
 PASS_BIN = os.environ.get("JWBMISC_PASS_BIN", "pass")
+OP_BIN = os.environ.get("JWBMISC_OP_BIN", "op")
 
 
 class BackendUnavailable(Exception):
@@ -34,7 +35,9 @@ def get_pass(*pass_keys: str, interactive: bool = True) -> str | list[str]:
 
     With ``interactive=False``, backends must not prompt and fall through instead:
     Keeper only uses a stored session, pass/gpg fails if the passphrase is not cached
-    in gpg-agent. Best effort for keyring: the OS may still show an access dialog.
+    in gpg-agent, 1Password does not use the desktop app (Touch ID) and needs a
+    service account, Connect or ``OP_SESSION`` token. Best effort for keyring: the OS
+    may still show an access dialog.
     """
     if not pass_keys:
         raise ValueError("no pass keys supplied")
@@ -65,8 +68,15 @@ def _backend_for(pass_key: str) -> Backend:
     return BACKENDS[scheme]
 
 
-def _has_module(name: str) -> bool:
-    return importlib.util.find_spec(name) is not None
+def _can_import(name: str) -> bool:
+    """True if the module imports cleanly. Optional backends must never break get_pass."""
+    try:
+        importlib.import_module(name)
+    # not only ImportError: a broken install can fail with anything at import time
+    except Exception as e:  # noqa: BLE001
+        logger.debug("cannot import %s: %r", name, e)
+        return False
+    return True
 
 
 # --- pass ---------------------------------------------------------------------
@@ -152,7 +162,7 @@ def _file_get(pass_key: str, _interactive: bool) -> str:
 
 
 def _keyring_available() -> bool:
-    if not _has_module("keyring"):
+    if not _can_import("keyring") or not _can_import("keyring.backends.fail"):
         return False
     import keyring
     from keyring.backends import fail
@@ -179,7 +189,8 @@ def _keyring_get(pass_key: str, _interactive: bool) -> str:
 
 
 def _keeper_available() -> bool:
-    return _has_module("keepercommander")
+    # import our keeper module, not just keepercommander: it pulls in the submodules we use
+    return _can_import("jwbmisc.keeper")
 
 
 def _keeper_get(pass_key: str, interactive: bool) -> str:
@@ -193,6 +204,43 @@ def _keeper_password(record_uid: str, field_path: str | None = None, interactive
     return keeper_get_password(record_uid, field_path, interactive=interactive)
 
 
+# --- 1password ----------------------------------------------------------------
+
+
+def _op_available() -> bool:
+    return shutil.which(OP_BIN) is not None
+
+
+def _op_env(interactive: bool) -> dict[str, str] | None:
+    if interactive:
+        return None
+    # app integration unlocks via the desktop app (Touch ID/password dialog), i.e. it
+    # prompts; without it, op only works with a service account, Connect or OP_SESSION
+    return {**os.environ, "OP_BIOMETRIC_UNLOCK_ENABLED": "false"}
+
+
+def _op_get(pass_key: str, interactive: bool) -> str:
+    # the URL is a 1Password secret reference as is: op://vault/item/[section/]field[?attribute=...]
+    cmd = [OP_BIN, "read", "--no-newline", pass_key]
+    if interactive:
+        # leave stdin/stderr on the terminal so op can prompt for a manual sign-in
+        proc = sp.run(cmd, check=False, stdout=sp.PIPE, encoding="utf-8")
+        if proc.returncode != 0:
+            raise KeyError(f"op read failed for '{pass_key}' (exit {proc.returncode}, see op output above)")
+    else:
+        proc = sp.run(
+            cmd,
+            check=False,
+            stdin=sp.DEVNULL,
+            capture_output=True,
+            encoding="utf-8",
+            env=_op_env(interactive),
+        )
+        if proc.returncode != 0:
+            raise KeyError(f"op read failed for '{pass_key}': {proc.stderr.strip()}")
+    return proc.stdout
+
+
 BACKENDS: dict[str, Backend] = {
     b.scheme: b
     for b in [
@@ -201,5 +249,6 @@ BACKENDS: dict[str, Backend] = {
         Backend("file", lambda: True, _file_get),
         Backend("keyring", _keyring_available, _keyring_get),
         Backend("keeper", _keeper_available, _keeper_get),
+        Backend("op", _op_available, _op_get),
     ]
 }

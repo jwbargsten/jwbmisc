@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# fake 1Password CLI: op read --no-newline <ref>
+[[ "$1" == "read" && "$2" == "--no-newline" ]] || { echo "[ERROR] unexpected args: $*" >&2; exit 2; }
+case "$3" in
+    "op://test/item/password") printf "op_secret";;
+    "op://test/item/one-time password?attribute=otp") printf "123456";;
+    "op://test/env/biometric") printf "%s" "${OP_BIOMETRIC_UNLOCK_ENABLED-<unset>}";;
+    "op://test/stdin/tty") [[ -t 0 ]] && printf "tty" || printf "no-tty";;
+    *) echo "[ERROR] could not read secret '$3': item not found" >&2; exit 1;;
+esac
